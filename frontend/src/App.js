@@ -72,6 +72,38 @@ function App() {
     }
   };
 
+  const handleRunNotebook2 = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setResult(null);
+    setSelectedPlot(null);
+
+    try {
+      const response = await fetch("http://127.0.0.1:5000/run-notebook-2", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company_name: company,
+          start_date: startDate,
+          end_date: endDate,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to fetch results");
+
+      const data = await response.json();
+      const usefulPlots = data.plots ? data.plots : [];
+      setResult({ ...data, plots: usefulPlots });
+    } catch (error) {
+      console.error(error);
+      alert("Error running notebook");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Predict future date
   const handlePredictDate = async (e) => {
     e.preventDefault();
@@ -87,6 +119,8 @@ function App() {
         },
         body: JSON.stringify({
           company_name: company,
+          start_date: startDate,
+          end_date: endDate,
           predict_date: predictDate,
         }),
       });
@@ -184,6 +218,15 @@ function App() {
               >
                 {loading ? "Training Model..." : "Run Notebook & Train"}
               </button>
+
+              {/* Train Model Button */}
+              <button
+                onClick={handleRunNotebook2}
+                disabled={loading}
+                className="submit-btn"
+              >
+                {loading ? "Training Model..." : "Run LSTM Notebook & Train"}
+              </button>
             </form>
           )}
 
@@ -202,6 +245,28 @@ function App() {
                   placeholder="e.g. AAPL, MSFT, GOOGL"
                   required
                 />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Start Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>End Date</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
 
               <div className="form-group">

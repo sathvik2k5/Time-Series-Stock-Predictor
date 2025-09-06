@@ -16,6 +16,7 @@ import os
 
 UPLOAD_NOTEBOOK = r"C:\Users\SATHVIK\Downloads\Quant Project\QP\backend\venv\Notebook_1_ARIMA_Fourier.ipynb"
 create_notebook = r"C:\Users\SATHVIK\Downloads\Quant Project\QP\backend\venv\Create_Data.ipynb"
+NOTEBOOK_2 = r"C:\Users\SATHVIK\Downloads\Quant Project\QP\backend\venv\Notebook_2_Predict.ipynb"
 
 app = Flask(__name__)
 CORS(app)
@@ -108,11 +109,61 @@ print("Injected params:", company_name, start_date, end_date)
 
     return jsonify({"outputs": outputs, "plots": plots})
 
+@app.route("/run-notebook-2", methods=["POST"])
+def run_notebook2():
+    data = request.json
+    company_name = data.get("company_name")
+    start_date = data.get("start_date")
+    end_date = data.get("end_date")
+
+    if not company_name or not start_date or not end_date:
+        return jsonify({"error": "Missing required parameters"}), 400
+
+    print("DEBUG:", company_name, start_date, end_date)
+
+    with open(NOTEBOOK_2, "r", encoding="utf-8") as f:
+        nb = nbformat.read(f, as_version=4)
+
+    # Inject parameters into notebook
+    nb["cells"].append(nbformat.v4.new_code_cell(
+        f"""
+company_name = "{company_name}"
+start_date = "{start_date}"
+end_date = "{end_date}"
+print("Injected params:", company_name, start_date, end_date)
+        """
+    ))
+
+    # Execute notebook
+    client = NotebookClient(nb)
+    client.execute()
+
+    outputs = []
+    plots = []
+
+    # Collect logs and plot images
+    for cell in nb.cells:
+        if "outputs" in cell:
+            for out in cell["outputs"]:
+                if out.output_type == "stream":
+                    outputs.append(out.text)
+
+                elif out.output_type == "display_data":
+                    if "image/png" in out.data:
+                        plots.append("data:image/png;base64," + out.data["image/png"])
+
+                elif out.output_type == "error":
+                    outputs.append("Error: " + " ".join(out.evalue))
+
+    return jsonify({"outputs": outputs, "plots": plots})
+
 
 @app.route("/predict-date", methods=["POST"])
 def predict_date():
     data = request.json
     company_name = data.get("company_name")
+    start_date = data.get("start_date")
+    end_date = data.get("end_date")
     predict_date = data.get("predict_date")
 
     if not company_name or not predict_date:
@@ -125,7 +176,7 @@ def predict_date():
         print("✅ Model and Scaler loaded successfully")
 
         # Load historical data
-        hist_data = pd.read_csv(f"AMZN_features.csv")
+        hist_data = pd.read_csv(f"{company_name}_{start_date}_{end_date}.csv")
         
         if hist_data.empty:
             return jsonify({"error": f"Could not fetch data for {company_name}"}), 400
@@ -150,7 +201,7 @@ def predict_date():
         scaled_data = scaler.transform(close_prices)
 
         # Use a rolling window approach for better predictions
-        window_size = 60  # Same as training
+        window_size = 1  # Same as training
         predictions = []
         
         # Start with the last window of data - CORRECTED SHAPE
